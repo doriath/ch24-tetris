@@ -1,0 +1,82 @@
+#!/usr/bin/env ruby
+
+require "bundler/setup"
+
+require 'eventmachine'
+
+class Tetromino
+  attr_reader :blocks
+
+  def initialize *blocks
+    @blocks = blocks
+  end
+
+  def self.random
+    array = []
+    array << Tetromino.new([0, 0], [1, 0], [2, 0], [3, 0])
+    array << Tetromino.new([0, 0], [0, 1], [1, 1], [2, 1])
+    array << Tetromino.new([0, 1], [1, 1], [2, 1], [2, 0])
+    array << Tetromino.new([0, 0], [0, 1], [1, 0], [1, 1])
+    array << Tetromino.new([0, 1], [1, 0], [1, 1], [2, 0])
+    array << Tetromino.new([0, 1], [1, 0], [1, 1], [2, 1])
+    array << Tetromino.new([0, 0], [1, 0], [1, 1], [2, 1])
+    array[rand(array.size)]
+  end
+
+  def rotate count
+  end
+
+  def to_s
+    blocks.join(" ")
+  end
+end
+
+class Board
+  attr_reader :points
+  attr_reader :field
+
+  def initialize
+    @points = 0
+  end
+
+  def add tetromino, position
+  end
+end
+
+module TetrisServer
+  include EventMachine::Protocols::LineText2
+
+  def post_init
+    puts "-- someone connected to the echo server!"
+    @board = Board.new
+    send_new_tetromino
+  end
+
+  def receive_line line
+    rotation, position = line.strip.split(" ").map(&:to_i)
+    if rotation.nil? or position.nil?
+      close_connection
+      return
+    end
+    @tetromino.rotate rotation
+    @board.add @tetromino, position
+    send_new_tetromino
+  end
+
+  def send_new_tetromino
+    @tetromino = Tetromino.random
+    send_line "BLOCK #{@tetromino.to_s}"
+  end
+
+  def send_line line
+    send_data line + "\n"
+  end
+
+  def unbind
+    puts "-- someone disconnected from the echo server!"
+  end
+end
+
+EventMachine.run do
+  EventMachine.start_server "127.0.0.1", 2001, TetrisServer
+end
